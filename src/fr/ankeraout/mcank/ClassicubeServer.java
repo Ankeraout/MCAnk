@@ -120,7 +120,7 @@ public final class ClassicubeServer {
 		}
 
 		// Create the listener thread
-		this.listenThread = new Thread(new ListenThreadRunnable());
+		this.listenThread = new Thread(() -> listenThreadMain());
 
 		// Start the listener thread
 		this.listenThread.start();
@@ -182,38 +182,27 @@ public final class ClassicubeServer {
 	public ClassicubeServerProperties getProperties() {
 		return this.properties;
 	}
+	
+	private void listenThreadMain() {
+		while(true) {
+			try {
+				Socket clientSocket = ClassicubeServer.this.socket.accept();
 
-	/**
-	 * This class contains the code for the listen thread of the server.
-	 * 
-	 * @author Ankeraout
-	 *
-	 */
-	private class ListenThreadRunnable implements Runnable {
-		/**
-		 * This method contains the code of the server listen thread. It is thus charged
-		 * of listening for incoming client connections, and accepting them.
-		 */
-		public void run() {
-			while(true) {
-				try {
-					Socket clientSocket = ClassicubeServer.this.socket.accept();
-
-					Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
-							clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort()
-									+ " is connecting...");
-				} catch(IOException e) {
-					synchronized(ClassicubeServer.this.stateLock) {
-						// Check if the exception occurred when the server was stopping. If so, the
-						// exception was caused by the call to ClassicubeServer.stop(), which is
-						// expected. We do not have to log a message in this situation. Otherwise, the
-						// exception testifies of another important problem. We cannot do anything from
-						// there, so we just put a log message and exit the thread.
-						if(ClassicubeServer.this.state != ClassicubeServerState.STOPPING) {
-							Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.SEVERE,
-									"Listen thread encountered an exception. The thread is no longer running, and new incoming client connections cannot be accepted.",
-									e);
-						}
+				Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
+						clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort()
+								+ " is connecting...");
+				
+			} catch(IOException e) {
+				synchronized(ClassicubeServer.this.stateLock) {
+					// Check if the exception occurred when the server was stopping. If so, the
+					// exception was caused by the call to ClassicubeServer.stop(), which is
+					// expected. We do not have to log a message in this situation. Otherwise, the
+					// exception testifies of another important problem. We cannot do anything from
+					// there, so we just put a log message and exit the thread.
+					if(ClassicubeServer.this.state != ClassicubeServerState.STOPPING) {
+						Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.SEVERE,
+								"Listen thread encountered an exception. The thread is no longer running, and new incoming client connections cannot be accepted.",
+								e);
 					}
 				}
 			}
