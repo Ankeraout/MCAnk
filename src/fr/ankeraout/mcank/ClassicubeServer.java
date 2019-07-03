@@ -1,9 +1,9 @@
 package fr.ankeraout.mcank;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,7 +20,7 @@ public final class ClassicubeServer {
 	 * The name of the logger. This value is passed as a parameter when calling
 	 * {@link Logger#getLogger(String)}.
 	 */
-	private static final String LOGGER_NAME = "ClassicubeServer";
+	public static final String LOGGER_NAME = "ClassicubeServer";
 
 	/**
 	 * The only instance of this class.
@@ -46,11 +46,13 @@ public final class ClassicubeServer {
 	 * The thread that is listening for incoming connections.
 	 */
 	private Thread listenThread;
-	
+
 	/**
-	 * The server properties.
+	 * The server properties. This is basically a dictionary that contains all of
+	 * the values of the server properties file. All the values in
+	 * assets/server-default.properties are always guaranteed to be defined.
 	 */
-	private Properties properties;
+	private ClassicubeServerProperties properties;
 
 	/**
 	 * The private constructor of the singleton.
@@ -61,6 +63,9 @@ public final class ClassicubeServer {
 
 		// Initialize the server state
 		this.state = ClassicubeServerState.STOPPED;
+
+		// Initialize the server data structures
+		this.properties = new ClassicubeServerProperties();
 	}
 
 	/**
@@ -70,30 +75,11 @@ public final class ClassicubeServer {
 	 * @return The instance of {@link ClassicubeServer}
 	 */
 	public static synchronized ClassicubeServer getInstance() {
-		if (ClassicubeServer.instance == null) {
+		if(ClassicubeServer.instance == null) {
 			ClassicubeServer.instance = new ClassicubeServer();
 		}
 
 		return ClassicubeServer.instance;
-	}
-	
-	/**
-	 * Loads the default server properties.
-	 */
-	public void loadDefaultProperties() {
-		// TODO
-	}
-
-	/**
-	 * Loads the server configuration from a properties file.
-	 * 
-	 * @throws IOException If an I/O exception occurred while reading the server
-	 *                     configuration file
-	 */
-	public void loadProperties() throws IOException {
-		this.loadDefaultProperties();
-		
-		// TODO
 	}
 
 	/**
@@ -103,21 +89,98 @@ public final class ClassicubeServer {
 	 * @throws RuntimeException If the server is not in the
 	 *                          {@link ClassicubeServerState#STOPPED} state.
 	 */
-	public void start() throws IOException {
+	public void start() throws IOException, RuntimeException {
+		// The state of the server before starting it
+		ClassicubeServerState oldState = null;
+
 		// Set the server state to STARTING
-		synchronized (this.stateLock) {
+		synchronized(this.stateLock) {
+			// Save the current server state
+			oldState = this.state;
+
 			// Reject the start request if the server is not STOPPED
-			if (!this.state.isStartCallAllowed()) {
+			if(!this.state.isStartCallAllowed()) {
 				throw new RuntimeException("The current server state does not allow starting it.");
 			}
 
 			this.state = ClassicubeServerState.STARTING;
 		}
 
+		// Bind the server socket
+		try {
+			this.socket = new ServerSocket(this.properties.getPort(), this.properties.getBacklog(), InetAddress.getByName(this.properties.getIP()));
+		} catch(IOException e) {
+			// Reset the server state
+			synchronized(this.stateLock) {
+				this.state = oldState;
+			}
+
+			// Propagate the exception
+			throw e;
+		}
+
+		// Create the listener thread
+		this.listenThread = new Thread(new ListenThreadRunnable());
+
+		// Start the listener thread
+		this.listenThread.start();
+
 		// Set the server state to STARTED
-		synchronized (this.stateLock) {
+		synchronized(this.stateLock) {
 			this.state = ClassicubeServerState.STARTED;
 		}
+	}
+
+	/**
+	 * Stops the server.
+	 * 
+	 * @throws RuntimeException If the server is not in the
+	 *                          {@link ClassicubeServerState#STARTED} state.
+	 */
+	public void stop() throws IOException, RuntimeException {
+		// The state of the server before stopping it
+		ClassicubeServerState oldState = null;
+
+		// Set the server state to STOPPING
+		synchronized(this.stateLock) {
+			// Save the current server state
+			oldState = this.state;
+
+			// Reject the stop request if the server is not STARTED
+			if(!this.state.isStopCallAllowed()) {
+				throw new RuntimeException("The current server state does not allow stopping it.");
+			}
+
+			this.state = ClassicubeServerState.STOPPING;
+		}
+
+		// Close the listener socket. This will cause the listener thread to exit as a
+		// side effect.
+		try {
+			this.socket.close();
+		} catch(IOException e) {
+			// Reset the server state
+			synchronized(this.stateLock) {
+				this.state = oldState;
+			}
+
+			// Propagate the exception
+			throw e;
+		}
+
+		// Set the server state to STOPPED
+		synchronized(this.stateLock) {
+			this.state = ClassicubeServerState.STOPPED;
+		}
+	}
+
+	/**
+	 * Returns the server properties object.
+	 * 
+	 * @return The server properties object
+	 */
+	public ClassicubeServerProperties getProperties() {
+		return this.properties;
 	}
 
 	/**
@@ -132,21 +195,21 @@ public final class ClassicubeServer {
 		 * of listening for incoming client connections, and accepting them.
 		 */
 		public void run() {
-			while (true) {
+			while(true) {
 				try {
 					Socket clientSocket = ClassicubeServer.this.socket.accept();
 
 					Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
 							clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort()
 									+ " is connecting...");
-				} catch (IOException e) {
-					synchronized (ClassicubeServer.this.stateLock) {
+				} catch(IOException e) {
+					synchronized(ClassicubeServer.this.stateLock) {
 						// Check if the exception occurred when the server was stopping. If so, the
 						// exception was caused by the call to ClassicubeServer.stop(), which is
 						// expected. We do not have to log a message in this situation. Otherwise, the
 						// exception testifies of another important problem. We cannot do anything from
 						// there, so we just put a log message and exit the thread.
-						if (ClassicubeServer.this.state != ClassicubeServerState.STOPPING) {
+						if(ClassicubeServer.this.state != ClassicubeServerState.STOPPING) {
 							Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.SEVERE,
 									"Listen thread encountered an exception. The thread is no longer running, and new incoming client connections cannot be accepted.",
 									e);
