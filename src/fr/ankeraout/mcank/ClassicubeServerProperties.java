@@ -200,6 +200,24 @@ public class ClassicubeServerProperties extends Properties {
 	}
 
 	/**
+	 * Returns the value of the given property as a boolean value.
+	 * 
+	 * @return The value of the given property as a boolean value.
+	 * @throws RuntimeException If the given property does not have a boolean value.
+	 */
+	private boolean getAsBoolean(String propertyName) {
+		String value = (String)this.get(propertyName);
+
+		if(value.equalsIgnoreCase("true")) {
+			return true;
+		} else if(value.equalsIgnoreCase("false")) {
+			return false;
+		} else {
+			throw new RuntimeException("The given property does not have a boolean value.");
+		}
+	}
+
+	/**
 	 * Returns the server socket backlog value.
 	 * 
 	 * @return The server socket backlog value.
@@ -226,6 +244,154 @@ public class ClassicubeServerProperties extends Properties {
 	 */
 	public String getIP() {
 		return (String)this.get("ip");
+	}
+
+	/**
+	 * Returns the name of the server.
+	 * 
+	 * @return The server's name.
+	 */
+	public String getName() {
+		return (String)this.get("name");
+	}
+
+	/**
+	 * Returns the message of the day of the server.
+	 * 
+	 * @return The message of the day of the server.
+	 */
+	public String getMotd() {
+		return (String)this.get("motd");
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the server is public or not.
+	 * 
+	 * @return A boolean value that determines whether the server is public or not.
+	 */
+	public boolean isPublic() {
+		return this.getAsBoolean("public");
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the server should be
+	 * advertising on the public server list server.
+	 * 
+	 * @return A boolean value that determines whether the server should be
+	 *         advertising on the public server list server.
+	 */
+	public boolean getAdvertise() {
+		return this.getAsBoolean("advertise");
+	}
+
+	/**
+	 * Returns the name of the default world
+	 * 
+	 * @return The name of the default world
+	 */
+	public String getDefaultWorld() {
+		return (String)this.get("default-world");
+	}
+
+	/**
+	 * Returns the name of the default rank
+	 * 
+	 * @return The name of the default rank
+	 */
+	public String getDefaultRank() {
+		return (String)this.get("default-rank");
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the name verification should
+	 * be enabled on the server.
+	 * 
+	 * @return A boolean value that determines whether the name verification should
+	 *         be enabled on the server.
+	 */
+	public boolean getNameVerification() {
+		return this.getAsBoolean("verify-names");
+	}
+
+	/**
+	 * Returns the amount of time in milliseconds before a player gets kicked for
+	 * inactivity during login phase.
+	 * 
+	 * @return The amount of time in milliseconds before a player gets kicked for
+	 *         inactivity during login phase.
+	 */
+	public int getLoginTimeout() {
+		return Integer.parseInt((String)this.get("login-timeout"));
+	}
+
+	/**
+	 * Returns the amount of time in milliseconds before a player gets kicked for
+	 * inactivity while playing.
+	 * 
+	 * @return The amount of time in milliseconds before a player gets kicked for
+	 *         inactivity while playing.
+	 */
+	public int getAfkTimeout() {
+		return Integer.parseInt((String)this.get("afk-timeout"));
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the white list should be
+	 * enabled.
+	 * 
+	 * @return A boolean value that determines whether the white list should be
+	 *         enabled.
+	 */
+	public boolean getWhitelist() {
+		return this.getAsBoolean("whitelist");
+	}
+
+	/**
+	 * Returns the interval of time between two world saves in milliseconds.
+	 * 
+	 * @return The interval of time between two world saves in milliseconds.
+	 */
+	public int getSaveInterval() {
+		return Integer.parseInt((String)this.get("save-interval"));
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the Nagle's algorithm should
+	 * be disabled on the server.
+	 * 
+	 * @return A boolean value that determines whether the Nagle's algorithm should
+	 *         be disabled on the server.
+	 */
+	public boolean getTcpNoDelay() {
+		return this.getAsBoolean("tcp-no-delay");
+	}
+
+	/**
+	 * Returns the maximum amount of players allowed on the server.
+	 * 
+	 * @return The maximum amount of players allowed on the server.
+	 */
+	public int getMaxPlayers() {
+		return Integer.parseInt((String)this.get("max-players"));
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the new lines in a chat
+	 * message should be marked.
+	 * 
+	 * @return A boolean value that determines whether the new lines in a chat
+	 *         message should be marked.
+	 */
+	public boolean getMarkNewLines() {
+		return this.getAsBoolean("mark-new-lines");
+	}
+
+	/**
+	 * Returns the time interval between 2 server ticks in milliseconds.
+	 * @return The time interval between 2 server ticks in milliseconds.
+	 */
+	public int getTickInterval() {
+		return Integer.parseInt((String)this.get("tick-interval"));
 	}
 
 	/**
