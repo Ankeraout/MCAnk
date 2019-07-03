@@ -1,5 +1,6 @@
 package fr.ankeraout.mcank;
 
+import java.io.IOException;
 import java.io.Serializable;
 
 import fr.ankeraout.mcank.worldgen.WorldGenerator;
@@ -14,6 +15,17 @@ import fr.ankeraout.mcank.worldgen.WorldGenerator;
  */
 public class World implements Serializable {
 	private static final long serialVersionUID = 2201071094020526724L;
+
+	/**
+	 * This lock protects the block data and the load status of the world.
+	 */
+	private Object worldLock;
+
+	/**
+	 * Contains the status of the world. See {@link WorldLoadStatus} for more
+	 * information.
+	 */
+	private WorldLoadState loadState;
 
 	/**
 	 * The name of the world.
@@ -132,6 +144,10 @@ public class World implements Serializable {
 			throw new IllegalArgumentException("The depth value is out of bounds.");
 		}
 
+		// Initialize locks
+		this.worldLock = new Object();
+
+		// Initialize world attributes
 		this.name = name;
 		this.motd = null;
 		this.width = width;
@@ -148,5 +164,173 @@ public class World implements Serializable {
 
 		// Generate world
 		generator.generateWorld(this.blockData, width, height, depth, seed);
+	}
+
+	/**
+	 * Loads the world.
+	 * 
+	 * @throws IOException      If the world file could not be read
+	 * @throws RuntimeException If the world is not in the
+	 *                          {@link WorldLoadState#UNLOADED} state.
+	 */
+	public void load() throws IOException, RuntimeException {
+		// The state of the world before loading it
+		WorldLoadState oldState = null;
+
+		// Set the world state to LOADING
+		synchronized (this.worldLock) {
+			// Save the current world state
+			oldState = this.loadState;
+
+			// Reject the load request if the world is not UNLOADED
+			if (!this.loadState.isStartCallAllowed()) {
+				throw new RuntimeException("The current world state does not allow loading it.");
+			}
+
+			this.loadState = WorldLoadState.LOADING;
+		}
+
+		// TODO
+
+		// Set the world state to LOADED
+		synchronized (this.worldLock) {
+			this.loadState = WorldLoadState.LOADED;
+		}
+	}
+
+	/**
+	 * Saves the world file.
+	 * 
+	 * @throws IOException If the world file could not be written.
+	 */
+	public void save() throws IOException {
+		// TODO
+	}
+
+	/**
+	 * Unloads the world.
+	 * 
+	 * @throws IOException      If the world file could not be written. If this
+	 *                          happens, the world unloading request is aborted to
+	 *                          prevent any data loss.
+	 * @throws RuntimeException If the world is not in the
+	 *                          {@link WorldLoadState#LOADED} state.
+	 */
+	public void unload() throws IOException, RuntimeException {
+		// The state of the world before stopping it
+		WorldLoadState oldState = null;
+
+		// Set the world state to UNLOADING
+		synchronized (this.worldLock) {
+			// Save the current world state
+			oldState = this.loadState;
+
+			// Reject the unload request if the world is not LOADED
+			if (!this.loadState.isStopCallAllowed()) {
+				throw new RuntimeException("The current world state does not allow unloading it.");
+			}
+
+			this.loadState = WorldLoadState.UNLOADING;
+		}
+
+		try {
+			this.save();
+		} catch (IOException e) {
+			// Reset the world state
+			synchronized (this.worldLock) {
+				this.loadState = oldState;
+			}
+		}
+
+		// TODO: kick all the players outside of this world
+
+		// Set the world state to UNLOADED
+		synchronized (this.worldLock) {
+			this.loadState = WorldLoadState.UNLOADED;
+
+			// Break the reference to the world data, allowing the garbage
+			// collector to destroy the object
+			this.blockData = null;
+		}
+	}
+
+	/**
+	 * This enum represents the current state of the world at a given time.
+	 * 
+	 * @author Ankeraout
+	 *
+	 */
+	private enum WorldLoadState {
+		/**
+		 * This value means that the world is currently unloaded. It could be in this
+		 * state for 2 reasons:
+		 * <ul>
+		 * <li>The world was not loaded before</li>
+		 * <li>The world was previously unloaded</li>
+		 * </ul>
+		 */
+		UNLOADED(true, false),
+
+		/**
+		 * This value means that the world is currently loading.
+		 */
+		LOADING(false, false),
+
+		/**
+		 * This value means that the world is currently loaded.
+		 */
+		LOADED(false, true),
+
+		/**
+		 * This value means that the world is currently unloading.
+		 */
+		UNLOADING(false, false);
+
+		/**
+		 * This value determines whether the world can be loaded when it is in this
+		 * state.
+		 */
+		private boolean canLoad;
+
+		/**
+		 * This value determines whether the world can be unloaded when it is in this
+		 * state.
+		 */
+		private boolean canUnload;
+
+		/**
+		 * Creates a new {@link WorldLoadState} value.
+		 * 
+		 * @param canLoad   A value that determines whether the {@link World#load()}
+		 *                  method can be called when the world is in this state.
+		 * @param canUnload A value that determines whether the {@link World#unload()}
+		 *                  method can be called when the world is in this state
+		 */
+		private WorldLoadState(boolean canLoad, boolean canUnload) {
+			this.canLoad = canLoad;
+			this.canUnload = canUnload;
+		}
+
+		/**
+		 * Returns a boolean value that determines whether the {@link World#load()}
+		 * method can be called when the world is in this state.
+		 * 
+		 * @return A boolean value that determines whether the {@link World#load()}
+		 *         method can be called when the world is in this state.
+		 */
+		public boolean isStartCallAllowed() {
+			return this.canLoad;
+		}
+
+		/**
+		 * Returns a boolean value that determines whether the {@link World#unload()}
+		 * method can be called when the world is in this state.
+		 * 
+		 * @return A boolean value that determines whether the {@link World#unload()}
+		 *         method can be called when the world is in this state.
+		 */
+		public boolean isStopCallAllowed() {
+			return this.canUnload;
+		}
 	}
 }
