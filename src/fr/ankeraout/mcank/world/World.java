@@ -1,7 +1,6 @@
-package fr.ankeraout.mcank;
+package fr.ankeraout.mcank.world;
 
 import java.io.IOException;
-import java.io.Serializable;
 
 import fr.ankeraout.mcank.worldgen.WorldGenerator;
 
@@ -13,9 +12,7 @@ import fr.ankeraout.mcank.worldgen.WorldGenerator;
  * @author Ankeraout
  *
  */
-public class World implements Serializable {
-	private static final long serialVersionUID = 2201071094020526724L;
-
+public class World {
 	/**
 	 * This lock protects the block data and the load status of the world.
 	 */
@@ -120,27 +117,27 @@ public class World implements Serializable {
 	 * @throws IllegalArgumentException If one of the argument values is incorrect.
 	 */
 	public World(String name, int width, int height, int depth, WorldGenerator generator, long seed) {
-		if (width % 16 != 0) {
+		if(width % 16 != 0) {
 			throw new IllegalArgumentException("The width value is not a multiple of 16.");
 		}
 
-		if (width < 16 || width > 1024) {
+		if(width < 16 || width > 1024) {
 			throw new IllegalArgumentException("The width value is out of bounds.");
 		}
 
-		if (height % 16 != 0) {
+		if(height % 16 != 0) {
 			throw new IllegalArgumentException("The height value is not a multiple of 16.");
 		}
 
-		if (height < 16 || height > 1024) {
+		if(height < 16 || height > 1024) {
 			throw new IllegalArgumentException("The height value is out of bounds.");
 		}
 
-		if (depth % 16 != 0) {
+		if(depth % 16 != 0) {
 			throw new IllegalArgumentException("The depth value is not a multiple of 16.");
 		}
 
-		if (depth < 16 || depth > 1024) {
+		if(depth < 16 || depth > 1024) {
 			throw new IllegalArgumentException("The depth value is out of bounds.");
 		}
 
@@ -178,12 +175,12 @@ public class World implements Serializable {
 		WorldLoadState oldState = null;
 
 		// Set the world state to LOADING
-		synchronized (this.worldLock) {
+		synchronized(this.worldLock) {
 			// Save the current world state
 			oldState = this.loadState;
 
 			// Reject the load request if the world is not UNLOADED
-			if (!this.loadState.isStartCallAllowed()) {
+			if(!this.loadState.isStartCallAllowed()) {
 				throw new RuntimeException("The current world state does not allow loading it.");
 			}
 
@@ -193,7 +190,7 @@ public class World implements Serializable {
 		// TODO
 
 		// Set the world state to LOADED
-		synchronized (this.worldLock) {
+		synchronized(this.worldLock) {
 			this.loadState = WorldLoadState.LOADED;
 		}
 	}
@@ -204,7 +201,9 @@ public class World implements Serializable {
 	 * @throws IOException If the world file could not be written.
 	 */
 	public void save() throws IOException {
-		// TODO
+		synchronized(this.worldLock) {
+			
+		}
 	}
 
 	/**
@@ -221,12 +220,12 @@ public class World implements Serializable {
 		WorldLoadState oldState = null;
 
 		// Set the world state to UNLOADING
-		synchronized (this.worldLock) {
+		synchronized(this.worldLock) {
 			// Save the current world state
 			oldState = this.loadState;
 
 			// Reject the unload request if the world is not LOADED
-			if (!this.loadState.isStopCallAllowed()) {
+			if(!this.loadState.isStopCallAllowed()) {
 				throw new RuntimeException("The current world state does not allow unloading it.");
 			}
 
@@ -235,9 +234,9 @@ public class World implements Serializable {
 
 		try {
 			this.save();
-		} catch (IOException e) {
+		} catch(IOException e) {
 			// Reset the world state
-			synchronized (this.worldLock) {
+			synchronized(this.worldLock) {
 				this.loadState = oldState;
 			}
 		}
@@ -245,7 +244,7 @@ public class World implements Serializable {
 		// TODO: kick all the players outside of this world
 
 		// Set the world state to UNLOADED
-		synchronized (this.worldLock) {
+		synchronized(this.worldLock) {
 			this.loadState = WorldLoadState.UNLOADED;
 
 			// Break the reference to the world data, allowing the garbage
