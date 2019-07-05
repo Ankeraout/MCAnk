@@ -1,5 +1,10 @@
 package fr.ankeraout.mcank;
 
+/**
+ * This enum contains the list of all the known blocks in the game.
+ * @author Ankeraout
+ *
+ */
 public enum Blocks {
 	AIR(0),
 	STONE(1),
@@ -68,12 +73,23 @@ public enum Blocks {
 	CRATE(64),
 	STONE_BRICK(65);
 	
+	/**
+	 * The ID of the block in the game.
+	 */
 	private int blockId;
 	
+	/**
+	 * Creates a new value in the {@link Blocks} enum, with the given block ID.
+	 * @param blockId The ID of the block to create.
+	 */
 	private Blocks(int blockId) {
 		this.blockId = blockId;
 	}
 	
+	/**
+	 * Returns the ID of the block corresponding to the enum value.
+	 * @return The ID of the block
+	 */
 	public int getBlockId() {
 		return this.blockId;
 	}

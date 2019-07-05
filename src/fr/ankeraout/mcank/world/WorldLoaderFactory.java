@@ -2,6 +2,16 @@ package fr.ankeraout.mcank.world;
 
 import java.util.HashMap;
 
+/**
+ * This class contains the code for storing the different {@link WorldLoader}
+ * objects. It is a singleton, which means that it is accessible from anywhere
+ * in the code, and that only one instance of this object can exist at a given
+ * time. The fact that this factory is a singleton allows player plugins (for
+ * example) to add their own world loading code as an extension.
+ * 
+ * @author Ankeraout
+ *
+ */
 public class WorldLoaderFactory {
 	/**
 	 * The unique instance of this class (singleton).
@@ -29,7 +39,7 @@ public class WorldLoaderFactory {
 	 * @return The unique instance of the {@link WorldLoaderFactory} class.
 	 */
 	public static synchronized WorldLoaderFactory getInstance() {
-		if(WorldLoaderFactory.instance == null) {
+		if (WorldLoaderFactory.instance == null) {
 			WorldLoaderFactory.instance = new WorldLoaderFactory();
 		}
 
@@ -60,7 +70,7 @@ public class WorldLoaderFactory {
 	 *                                  value was already previously registered.
 	 */
 	public void addWorldLoader(WorldLoader worldLoader) {
-		if(this.worldLoaders.containsKey(worldLoader.getMagicValue())) {
+		if (this.worldLoaders.containsKey(worldLoader.getMagicValue())) {
 			throw new IllegalArgumentException("A world loader with the same magic value is already registered.");
 		}
 

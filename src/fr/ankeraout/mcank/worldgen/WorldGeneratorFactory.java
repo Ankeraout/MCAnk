@@ -7,7 +7,9 @@ import java.util.Set;
 /**
  * This class contains a list of all the available world generators. It is a
  * singleton factory, which means that it can be accessed from anywhere in the
- * code.
+ * code, and that only one instance of this class can exist at a given time.
+ * Because it can be accessed from anywhere in the code as it is a singleton,
+ * server plugins can register their own world generators as an extension.
  * 
  * @author Ankeraout
  *
@@ -82,6 +84,7 @@ public class WorldGeneratorFactory {
 
 	/**
 	 * Returns a set that contains the names of all the available generators.
+	 * 
 	 * @return A set that contains the names of all the available generators.
 	 */
 	public Set<String> getAvailableGenerators() {
