@@ -4,8 +4,15 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import fr.ankeraout.mcank.util.StringUtils;
 
 /**
  * This class contains the main part of the server code which is the server loop
@@ -21,6 +28,11 @@ public final class ClassicubeServer {
 	 * {@link Logger#getLogger(String)}.
 	 */
 	public static final String LOGGER_NAME = "ClassicubeServer";
+
+	/**
+	 * The current version of the game protocol.
+	 */
+	public static final int PROTOCOL_VERSION = 0x07;
 
 	/**
 	 * The only instance of this class.
@@ -55,6 +67,14 @@ public final class ClassicubeServer {
 	private ClassicubeServerProperties properties;
 
 	/**
+	 * The salt of the server. This value is strictly confidential and should not be
+	 * accessible from anywhere in the code, to prevent any plugin from stealing
+	 * this value and using it maliciously. For security reasons, it is regenerated
+	 * on every server start, and not kept anywhere on the disk.
+	 */
+	private String salt;
+
+	/**
 	 * The private constructor of the singleton.
 	 */
 	private ClassicubeServer() {
@@ -66,6 +86,9 @@ public final class ClassicubeServer {
 
 		// Initialize the server data structures
 		this.properties = new ClassicubeServerProperties();
+
+		// The salt is not generated yet.
+		this.salt = null;
 	}
 
 	/**
@@ -75,11 +98,33 @@ public final class ClassicubeServer {
 	 * @return The instance of {@link ClassicubeServer}
 	 */
 	public static synchronized ClassicubeServer getInstance() {
-		if(ClassicubeServer.instance == null) {
+		if (ClassicubeServer.instance == null) {
 			ClassicubeServer.instance = new ClassicubeServer();
 		}
 
 		return ClassicubeServer.instance;
+	}
+
+	/**
+	 * Generates a new salt for the server.
+	 */
+	private void generateSalt() {
+		StringBuilder stringBuilder = new StringBuilder();
+		Random random = new SecureRandom();
+		
+		for(int i = 0; i < 16; i++) {
+			int randomValue = random.nextInt(62);
+
+			if(randomValue < 10) {
+				stringBuilder.append((char)('0' + randomValue));
+			} else if(randomValue < 36) {
+				stringBuilder.append((char)('a' + randomValue - 10)); 
+			} else {
+				stringBuilder.append((char)('A' + randomValue - 36)); 
+			}
+		}
+		
+		this.salt = stringBuilder.toString();
 	}
 
 	/**
@@ -94,24 +139,30 @@ public final class ClassicubeServer {
 		ClassicubeServerState oldState = null;
 
 		// Set the server state to STARTING
-		synchronized(this.stateLock) {
+		synchronized (this.stateLock) {
 			// Save the current server state
 			oldState = this.state;
 
 			// Reject the start request if the server is not STOPPED
-			if(!this.state.isStartCallAllowed()) {
+			if (!this.state.isStartCallAllowed()) {
 				throw new RuntimeException("The current server state does not allow starting it.");
 			}
 
 			this.state = ClassicubeServerState.STARTING;
 		}
 
+		// Generate the server salt
+		this.generateSalt();
+		
+		Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO, "Server salt: " + this.salt + ".");
+
 		// Bind the server socket
 		try {
-			this.socket = new ServerSocket(this.properties.getPort(), this.properties.getBacklog(), InetAddress.getByName(this.properties.getIP()));
-		} catch(IOException e) {
+			this.socket = new ServerSocket(this.properties.getPort(), this.properties.getBacklog(),
+					InetAddress.getByName(this.properties.getIP()));
+		} catch (IOException e) {
 			// Reset the server state
-			synchronized(this.stateLock) {
+			synchronized (this.stateLock) {
 				this.state = oldState;
 			}
 
@@ -126,7 +177,7 @@ public final class ClassicubeServer {
 		this.listenThread.start();
 
 		// Set the server state to STARTED
-		synchronized(this.stateLock) {
+		synchronized (this.stateLock) {
 			this.state = ClassicubeServerState.STARTED;
 		}
 	}
@@ -142,12 +193,12 @@ public final class ClassicubeServer {
 		ClassicubeServerState oldState = null;
 
 		// Set the server state to STOPPING
-		synchronized(this.stateLock) {
+		synchronized (this.stateLock) {
 			// Save the current server state
 			oldState = this.state;
 
 			// Reject the stop request if the server is not STARTED
-			if(!this.state.isStopCallAllowed()) {
+			if (!this.state.isStopCallAllowed()) {
 				throw new RuntimeException("The current server state does not allow stopping it.");
 			}
 
@@ -158,9 +209,9 @@ public final class ClassicubeServer {
 		// side effect.
 		try {
 			this.socket.close();
-		} catch(IOException e) {
+		} catch (IOException e) {
 			// Reset the server state
-			synchronized(this.stateLock) {
+			synchronized (this.stateLock) {
 				this.state = oldState;
 			}
 
@@ -169,8 +220,11 @@ public final class ClassicubeServer {
 		}
 
 		// Set the server state to STOPPED
-		synchronized(this.stateLock) {
+		synchronized (this.stateLock) {
 			this.state = ClassicubeServerState.STOPPED;
+			
+			// Forget the server salt
+			this.salt = null;
 		}
 	}
 
@@ -182,9 +236,13 @@ public final class ClassicubeServer {
 	public ClassicubeServerProperties getProperties() {
 		return this.properties;
 	}
-	
+
+	/**
+	 * This method contains the main code for the listen thread. It is in charge for
+	 * waiting for incoming client connections, and accepting them.
+	 */
 	private void listenThreadMain() {
-		while(true) {
+		while (true) {
 			try {
 				Socket clientSocket = ClassicubeServer.this.socket.accept();
 
@@ -192,14 +250,15 @@ public final class ClassicubeServer {
 						clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort()
 								+ " is connecting...");
 				
-			} catch(IOException e) {
-				synchronized(ClassicubeServer.this.stateLock) {
+				new Player(clientSocket);
+			} catch (IOException e) {
+				synchronized (ClassicubeServer.this.stateLock) {
 					// Check if the exception occurred when the server was stopping. If so, the
 					// exception was caused by the call to ClassicubeServer.stop(), which is
 					// expected. We do not have to log a message in this situation. Otherwise, the
 					// exception testifies of another important problem. We cannot do anything from
 					// there, so we just put a log message and exit the thread.
-					if(ClassicubeServer.this.state != ClassicubeServerState.STOPPING) {
+					if (ClassicubeServer.this.state != ClassicubeServerState.STOPPING) {
 						Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.SEVERE,
 								"Listen thread encountered an exception. The thread is no longer running, and new incoming client connections cannot be accepted.",
 								e);
@@ -207,6 +266,50 @@ public final class ClassicubeServer {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Returns a boolean value that determines whether the name verification key is
+	 * correct or not. If it is correct, then this method will return
+	 * <code>true</code>, otherwise it will return <code>false</code>.
+	 * 
+	 * @param name   The login of the player
+	 * @param mppass The name verification key of the player
+	 * @return Returns a boolean value that determines whether the name verification
+	 *         key is correct or not.
+	 * @throws RuntimeException if the server is not in the
+	 *                          {@link ClassicubeServerState#STARTED} state, or if
+	 *                          the JRE does not support MD5 hash algorithm.
+	 */
+	public boolean verifyName(String name, String mppass) {
+		// Get the salt
+		String salt = null;
+
+		synchronized (this.stateLock) {
+			// If the server is not in the STARTED state, then the salt is not generated
+			// yet, so we just throw an exception.
+			if (this.state != ClassicubeServerState.STARTED) {
+				throw new RuntimeException("The server is not started.");
+			}
+
+			salt = this.salt;
+		}
+
+		// Get the message digest instance for MD5
+		MessageDigest messageDigest = null;
+
+		try {
+			messageDigest = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			// This should never happen
+			throw new RuntimeException("The server does not support MD5 hash algorithm.");
+		}
+
+		// Compute the expected name verification key
+		byte[] hashResult = messageDigest.digest((salt + name).getBytes(Charset.forName("US-ASCII")));
+
+		// Check the correspondance of the values
+		return StringUtils.arrayToHex(hashResult).equalsIgnoreCase(mppass);
 	}
 
 	/**
