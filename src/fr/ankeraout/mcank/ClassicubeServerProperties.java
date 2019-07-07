@@ -79,7 +79,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @param p The object that contains the property values to take.
 	 */
 	private void merge(Properties p) {
-		for(Object key : p.keySet()) {
+		for (Object key : p.keySet()) {
 			super.put(key, p.get(key));
 		}
 	}
@@ -92,36 +92,35 @@ public class ClassicubeServerProperties extends Properties {
 	 *                          wrong.
 	 */
 	private static void checkProperties(Properties p) throws RuntimeException {
-		for(PropertyRecord propertyRecord : ClassicubeServerProperties.propertyRecords) {
-			if(p.containsKey(propertyRecord.getPropertyName())) {
-				switch(propertyRecord.getPropertyType()) {
-					case "STRING":
-						// Nothing to do, the property is already a String
-						break;
-					case "INTEGER":
-						// Try to parse the property value as as integer
-						try {
-							Integer.parseInt(p.getProperty(propertyRecord.getPropertyName()));
-						} catch(NumberFormatException e) {
-							// Failed to parse the integer, we throw an exception.
-							throw new RuntimeException("Failed to parse an integer value for the following property: "
-									+ propertyRecord.getPropertyName());
-						}
-						break;
-					case "BOOLEAN":
-						// Try to parse a boolean value
-						if(!p.getProperty(propertyRecord.getPropertyName()).equalsIgnoreCase("true")
-								&& !p.getProperty(propertyRecord.getPropertyName()).equalsIgnoreCase("false")) {
-							// Failed to parse the boolean value, we throw an exception.
-							throw new RuntimeException("Failed to parse a boolean value for the following property: "
-									+ propertyRecord.getPropertyName());
-						}
-						break;
-					default:
-						// If this ever happens, this definitely is a bug. The type needs to be added to
-						// this switch.
-						throw new RuntimeException(
-								"Unknown property type \"" + propertyRecord.getPropertyType() + "\".");
+		for (PropertyRecord propertyRecord : ClassicubeServerProperties.propertyRecords) {
+			if (p.containsKey(propertyRecord.getPropertyName())) {
+				switch (propertyRecord.getPropertyType()) {
+				case "STRING":
+					// Nothing to do, the property is already a String
+					break;
+				case "INTEGER":
+					// Try to parse the property value as as integer
+					try {
+						Integer.parseInt(p.getProperty(propertyRecord.getPropertyName()));
+					} catch (NumberFormatException e) {
+						// Failed to parse the integer, we throw an exception.
+						throw new RuntimeException("Failed to parse an integer value for the following property: "
+								+ propertyRecord.getPropertyName());
+					}
+					break;
+				case "BOOLEAN":
+					// Try to parse a boolean value
+					if (!p.getProperty(propertyRecord.getPropertyName()).equalsIgnoreCase("true")
+							&& !p.getProperty(propertyRecord.getPropertyName()).equalsIgnoreCase("false")) {
+						// Failed to parse the boolean value, we throw an exception.
+						throw new RuntimeException("Failed to parse a boolean value for the following property: "
+								+ propertyRecord.getPropertyName());
+					}
+					break;
+				default:
+					// If this ever happens, this definitely is a bug. The type needs to be added to
+					// this switch.
+					throw new RuntimeException("Unknown property type \"" + propertyRecord.getPropertyType() + "\".");
 				}
 			}
 		}
@@ -133,7 +132,7 @@ public class ClassicubeServerProperties extends Properties {
 	public void loadDefaultProperties() {
 		try {
 			this.load(System.class.getResourceAsStream(ClassicubeServerProperties.DEFAULT_PROPERTIES_FILE_PATH));
-		} catch(IOException e) {
+		} catch (IOException e) {
 			throw new RuntimeException("An exception occurred while loading the default properties file.", e);
 		}
 	}
@@ -153,7 +152,7 @@ public class ClassicubeServerProperties extends Properties {
 		File propertiesFilePath = new File(ClassicubeServerProperties.PROPERTIES_FILE_PATH);
 
 		// If the properties file does not exist, create it with the default values
-		if(!propertiesFilePath.exists()) {
+		if (!propertiesFilePath.exists()) {
 			// Copy the default properties file
 			Files.copy(System.class.getResourceAsStream(ClassicubeServerProperties.DEFAULT_PROPERTIES_FILE_PATH),
 					new File(ClassicubeServerProperties.PROPERTIES_FILE_PATH).toPath());
@@ -165,7 +164,7 @@ public class ClassicubeServerProperties extends Properties {
 			// We don't need to load it again because the default values were already loaded
 			// previously. We just need to exit the method.
 			return;
-		} else if(!propertiesFilePath.isFile()) {
+		} else if (!propertiesFilePath.isFile()) {
 			throw new RuntimeException("The path to the server properties file leads to something that is not a file.");
 		}
 
@@ -206,11 +205,11 @@ public class ClassicubeServerProperties extends Properties {
 	 * @throws RuntimeException If the given property does not have a boolean value.
 	 */
 	private boolean getAsBoolean(String propertyName) {
-		String value = (String)this.get(propertyName);
+		String value = (String) this.get(propertyName);
 
-		if(value.equalsIgnoreCase("true")) {
+		if (value.equalsIgnoreCase("true")) {
 			return true;
-		} else if(value.equalsIgnoreCase("false")) {
+		} else if (value.equalsIgnoreCase("false")) {
 			return false;
 		} else {
 			throw new RuntimeException("The given property does not have a boolean value.");
@@ -223,7 +222,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The server socket backlog value.
 	 */
 	public int getBacklog() {
-		return Integer.parseInt((String)this.get("backlog"));
+		return Integer.parseInt((String) this.get("backlog"));
 	}
 
 	/**
@@ -232,7 +231,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The TCP port number that the server will be listening to
 	 */
 	public int getPort() {
-		return Integer.parseInt((String)this.get("port"));
+		return Integer.parseInt((String) this.get("port"));
 	}
 
 	/**
@@ -243,7 +242,7 @@ public class ClassicubeServerProperties extends Properties {
 	 *         on.
 	 */
 	public String getIP() {
-		return (String)this.get("ip");
+		return (String) this.get("ip");
 	}
 
 	/**
@@ -252,7 +251,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The server's name.
 	 */
 	public String getName() {
-		return (String)this.get("name");
+		return (String) this.get("name");
 	}
 
 	/**
@@ -261,7 +260,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The message of the day of the server.
 	 */
 	public String getMotd() {
-		return (String)this.get("motd");
+		return (String) this.get("motd");
 	}
 
 	/**
@@ -290,7 +289,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The name of the default world
 	 */
 	public String getDefaultWorld() {
-		return (String)this.get("default-world");
+		return (String) this.get("default-world");
 	}
 
 	/**
@@ -299,7 +298,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The name of the default rank
 	 */
 	public String getDefaultRank() {
-		return (String)this.get("default-rank");
+		return (String) this.get("default-rank");
 	}
 
 	/**
@@ -321,7 +320,7 @@ public class ClassicubeServerProperties extends Properties {
 	 *         inactivity during login phase.
 	 */
 	public int getLoginTimeout() {
-		return Integer.parseInt((String)this.get("login-timeout"));
+		return Integer.parseInt((String) this.get("login-timeout"));
 	}
 
 	/**
@@ -332,7 +331,7 @@ public class ClassicubeServerProperties extends Properties {
 	 *         inactivity while playing.
 	 */
 	public int getAfkTimeout() {
-		return Integer.parseInt((String)this.get("afk-timeout"));
+		return Integer.parseInt((String) this.get("afk-timeout"));
 	}
 
 	/**
@@ -352,7 +351,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The interval of time between two world saves in milliseconds.
 	 */
 	public int getSaveInterval() {
-		return Integer.parseInt((String)this.get("save-interval"));
+		return Integer.parseInt((String) this.get("save-interval"));
 	}
 
 	/**
@@ -372,7 +371,7 @@ public class ClassicubeServerProperties extends Properties {
 	 * @return The maximum amount of players allowed on the server.
 	 */
 	public int getMaxPlayers() {
-		return Integer.parseInt((String)this.get("max-players"));
+		return Integer.parseInt((String) this.get("max-players"));
 	}
 
 	/**
@@ -388,10 +387,11 @@ public class ClassicubeServerProperties extends Properties {
 
 	/**
 	 * Returns the time interval between 2 server ticks in milliseconds.
+	 * 
 	 * @return The time interval between 2 server ticks in milliseconds.
 	 */
 	public int getTickInterval() {
-		return Integer.parseInt((String)this.get("tick-interval"));
+		return Integer.parseInt((String) this.get("tick-interval"));
 	}
 
 	/**
