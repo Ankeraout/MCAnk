@@ -80,6 +80,12 @@ public class Player {
 	private Object outputStreamLock;
 
 	/**
+	 * This lock prevents the {@link Player#setWorldAsync()} from being executed
+	 * more than once at a time.
+	 */
+	private Object setWorldLock;
+
+	/**
 	 * Creates a new {@link Player} object. Two threads will be started after
 	 * calling this constructor:
 	 * <ul>
@@ -95,9 +101,10 @@ public class Player {
 	 */
 	public Player(Socket socket) throws IOException {
 		this.socket = socket;
-		
+
 		// Initialize the locks
 		this.outputStreamLock = new Object();
+		this.setWorldLock = new Object();
 
 		// Retrieve the socket streams.
 		this.inputStream = new ClassicubeInputStream(socket.getInputStream());
@@ -123,12 +130,22 @@ public class Player {
 	 */
 	private void verifyName(String mppass) throws Exception {
 		try {
-			if(!ClassicubeServer.getInstance().verifyName(this.name, mppass)) {
+			if (!ClassicubeServer.getInstance().verifyName(this.name, mppass)) {
 				throw new Exception("Name verification failed.");
 			}
-		} catch(RuntimeException e) {
+		} catch (RuntimeException e) {
 			this.kick(e.getMessage());
 		}
+	}
+
+	/**
+	 * This method is in charge for CPE negotiation with the client. The CPE
+	 * negotiation process is basically the short exchange of ExtInfo and ExtEntry
+	 * packets that happens after the client has sent his handshake packet, and
+	 * before the server sends his handshake packet.
+	 */
+	private void doCPENegotiation() {
+		// Nothing for now
 	}
 
 	/**
@@ -171,10 +188,12 @@ public class Player {
 			}
 		}
 
-		// Read the unused byte
-		this.inputStream.read();
-		
 		Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO, this.name + " is connecting...");
+
+		// Do CPE negotiation if the client supports it.
+		if (this.inputStream.read() == 0x42) {
+			this.doCPENegotiation();
+		}
 
 		// Kill the player login timeout thread
 		this.playerloginTimeoutThread.interrupt();
@@ -198,11 +217,14 @@ public class Player {
 			// Terminate the thread
 			return;
 		}
-		
+
 		// Kill the login timeout thread
 		this.playerloginTimeoutThread.interrupt();
-		
-		// TODO: Teleport player to the main world
+
+		// Teleport player to the main world
+		this.setWorld(ClassicubeServer.getInstance()
+				.getWorldByName(ClassicubeServer.getInstance().getProperties().getDefaultWorld()));
+
 		// TODO: Read incoming player packets
 	}
 
@@ -237,6 +259,28 @@ public class Player {
 		}
 	}
 
+	private void setWorldAsync() throws IOException {
+		synchronized (this.setWorldLock) {
+			synchronized (this.outputStreamLock) {
+				this.outputStream.writeByte(PacketID.LEVEL_INITIALIZE.getID());
+			}
+
+		}
+	}
+
+	public void setWorld(World w) {
+		synchronized (this.setWorldLock) {
+			new Thread(() -> {
+				try {
+					this.setWorldAsync();
+				} catch (IOException e) {
+					Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
+							"Player " + this.name + " has left the game while receiving map data.");
+				}
+			}).start();
+		}
+	}
+
 	/**
 	 * Kicks the player and shows him the given error message.
 	 * 
@@ -246,15 +290,16 @@ public class Player {
 	 */
 	public void kick(String reason) throws IOException {
 		String identifier = null;
-		
-		if(this.name == null) {
+
+		if (this.name == null) {
 			identifier = this.socket.getRemoteSocketAddress().toString();
 		} else {
 			identifier = this.name;
 		}
-		
-		Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO, "Player \"" + identifier + "\" was kicked. Reason: " + reason);
-		
+
+		Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
+				"Player \"" + identifier + "\" was kicked. Reason: " + reason);
+
 		synchronized (this.outputStreamLock) {
 			// Send the kick packet
 			this.outputStream.write(PacketID.KICK.getID());

@@ -8,11 +8,14 @@ import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.HashMap;
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import fr.ankeraout.mcank.util.StringUtils;
+import fr.ankeraout.mcank.world.World;
+import fr.ankeraout.mcank.worldgen.WorldGeneratorFactory;
 
 /**
  * This class contains the main part of the server code which is the server loop
@@ -75,6 +78,16 @@ public final class ClassicubeServer {
 	private String salt;
 
 	/**
+	 * The list of all the worlds of the server.
+	 */
+	private HashMap<String, World> worlds;
+
+	/**
+	 * The list of all the ranks of the server.
+	 */
+	private HashMap<String, Rank> ranks;
+
+	/**
 	 * The private constructor of the singleton.
 	 */
 	private ClassicubeServer() {
@@ -86,6 +99,7 @@ public final class ClassicubeServer {
 
 		// Initialize the server data structures
 		this.properties = new ClassicubeServerProperties();
+		this.worlds = new HashMap<String, World>();
 
 		// The salt is not generated yet.
 		this.salt = null;
@@ -111,19 +125,19 @@ public final class ClassicubeServer {
 	private void generateSalt() {
 		StringBuilder stringBuilder = new StringBuilder();
 		Random random = new SecureRandom();
-		
-		for(int i = 0; i < 16; i++) {
+
+		for (int i = 0; i < 16; i++) {
 			int randomValue = random.nextInt(62);
 
-			if(randomValue < 10) {
-				stringBuilder.append((char)('0' + randomValue));
-			} else if(randomValue < 36) {
-				stringBuilder.append((char)('a' + randomValue - 10)); 
+			if (randomValue < 10) {
+				stringBuilder.append((char) ('0' + randomValue));
+			} else if (randomValue < 36) {
+				stringBuilder.append((char) ('a' + randomValue - 10));
 			} else {
-				stringBuilder.append((char)('A' + randomValue - 36)); 
+				stringBuilder.append((char) ('A' + randomValue - 36));
 			}
 		}
-		
+
 		this.salt = stringBuilder.toString();
 	}
 
@@ -151,9 +165,27 @@ public final class ClassicubeServer {
 			this.state = ClassicubeServerState.STARTING;
 		}
 
+		// TODO: Detect worlds
+		// TODO: Load main world
+
+		// If the main world does not exist, generate a 128^3 flatgrass map.
+		if (!this.worlds.containsKey(this.properties.getDefaultWorld())) {
+			Random random = new Random();
+			this.worlds.put(this.properties.getDefaultWorld(), new World(this.properties.getDefaultWorld(), 128, 128,
+					128, WorldGeneratorFactory.getInstance().getGenerator("flatgrass"), random.nextLong()));
+		}
+
+		// TODO: Detect and load ranks
+
+		// If the default rank does not exist, generate the default rank with permission
+		// level 0.
+		if (!this.ranks.containsKey(this.properties.getDefaultRank())) {
+			this.ranks.put(this.properties.getDefaultRank(), new Rank(this.properties.getDefaultRank(), '7', 0));
+		}
+
 		// Generate the server salt
 		this.generateSalt();
-		
+
 		Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO, "Server salt: " + this.salt + ".");
 
 		// Bind the server socket
@@ -222,7 +254,7 @@ public final class ClassicubeServer {
 		// Set the server state to STOPPED
 		synchronized (this.stateLock) {
 			this.state = ClassicubeServerState.STOPPED;
-			
+
 			// Forget the server salt
 			this.salt = null;
 		}
@@ -249,7 +281,7 @@ public final class ClassicubeServer {
 				Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
 						clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort()
 								+ " is connecting...");
-				
+
 				new Player(clientSocket);
 			} catch (IOException e) {
 				synchronized (ClassicubeServer.this.stateLock) {
@@ -310,6 +342,16 @@ public final class ClassicubeServer {
 
 		// Check the correspondance of the values
 		return StringUtils.arrayToHex(hashResult).equalsIgnoreCase(mppass);
+	}
+
+	/**
+	 * Returns a world by its name, or <code>null</code> if no world has this name.
+	 * 
+	 * @param worldName The name of the world.
+	 * @return The world with the given name.
+	 */
+	public World getWorldByName(String worldName) {
+		return this.worlds.get(worldName);
 	}
 
 	/**

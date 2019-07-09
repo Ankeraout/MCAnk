@@ -26,6 +26,22 @@ public interface Command {
 	public String[] getAliases();
 
 	/**
+	 * The default permission level of the command. This method should return one
+	 * value from the following ones:
+	 * <ul>
+	 * <li>0: If the command should be available to everyone</li>
+	 * <li>20: If the command should be available to people who have little experience on the server</li>
+	 * <li>40: If the command should be available to people who have experience on the server</li>
+	 * <li>60: If the command should be available to people who have a lot of experience on the server</li>
+	 * <li>80: If the command should be available to the server moderators</li>
+	 * <li>100: If the command should be available to the server administrators</li>
+	 * </ul>
+	 * 
+	 * @return The default permission level of the command.
+	 */
+	public int getDefaultPermissionLevel();
+
+	/**
 	 * This method is called everytime a player calls this command, if he has the
 	 * permission to do so.
 	 * 
