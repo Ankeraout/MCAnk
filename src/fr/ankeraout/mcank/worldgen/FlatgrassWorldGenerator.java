@@ -27,7 +27,7 @@ public class FlatgrassWorldGenerator extends WorldGenerator {
 
 		for (int x = chunkBlockX; x < chunkBlockX + 16; x++) {
 			for (int z = chunkBlockZ; z < chunkBlockZ + 16; z++) {
-				worldData[((worldHeight / 2) * worldDepth + z) * worldWidth + x] = Blocks.GRASS.getBlockId();
+				worldData[(((worldHeight / 2) - 1) * worldDepth + z) * worldWidth + x] = Blocks.GRASS.getBlockId();
 			}
 		}
 	}
@@ -44,9 +44,8 @@ public class FlatgrassWorldGenerator extends WorldGenerator {
 
 		for (int x = 0; x < worldWidth; x++) {
 			for (int z = 0; z < worldDepth; z++) {
-				worldData[((worldHeight / 2) * worldDepth + z) * worldWidth + x] = Blocks.GRASS.getBlockId();
+				worldData[(((worldHeight / 2) - 1) * worldDepth + z) * worldWidth + x] = Blocks.GRASS.getBlockId();
 			}
 		}
 	}
-
 }

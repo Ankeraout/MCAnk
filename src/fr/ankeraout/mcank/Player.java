@@ -275,6 +275,10 @@ public class Player {
 			}
 
 			byte[] worldData = w.registerPlayer(this);
+			
+			if(this.world != null) {
+				this.world.unregisterPlayer(this);
+			}
 
 			this.world = w;
 
@@ -323,22 +327,6 @@ public class Player {
 				this.outputStream.writeShort(this.position.getShortZ());
 				this.outputStream.writeByte(this.orientation.getByteYaw());
 				this.outputStream.writeByte(this.orientation.getBytePitch());
-			}
-
-			synchronized (this.outputStreamLock) {
-				this.outputStream.writeByte(PacketID.POSITION_ORIENTATION_ABSOLUTE.getID());
-				this.outputStream.writeByte(255);
-				this.outputStream.writeShort(this.position.getShortX());
-				this.outputStream.writeShort(this.position.getShortY());
-				this.outputStream.writeShort(this.position.getShortZ());
-				this.outputStream.writeByte(this.orientation.getByteYaw());
-				this.outputStream.writeByte(this.orientation.getBytePitch());
-			}
-
-			synchronized (this.outputStreamLock) {
-				this.outputStream.writeByte(PacketID.MESSAGE.getID());
-				this.outputStream.writeByte(0x00);
-				this.outputStream.writeClassicubeString("Welcome!");
 			}
 		}
 	}

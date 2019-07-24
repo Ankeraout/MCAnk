@@ -186,7 +186,7 @@ public class World {
 		this.depth = depth;
 		this.blockData = new int[width * height * depth];
 		this.spawnX = width / 2f;
-		this.spawnY = height / 2f;
+		this.spawnY = height / 2f + 1.59375f;
 		this.spawnZ = depth / 2f;
 		this.spawnYaw = 0f;
 		this.spawnPitch = 0f;
@@ -424,29 +424,32 @@ public class World {
 	 * @return The world data to send to the player.
 	 */
 	public byte[] registerPlayer(Player player) {
-		try {
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			GZIPOutputStream gzos = new GZIPOutputStream(baos);
-			DataOutputStream dos = new DataOutputStream(gzos);
+		synchronized (this.worldLock) {
+			try {
+				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+				GZIPOutputStream gzos = new GZIPOutputStream(baos);
+				DataOutputStream dos = new DataOutputStream(gzos);
+				DataOutputStream dos2 = new DataOutputStream(baos);
 
-			// Write the world volume
-			int volume = this.getVolume();
+				// Write the world volume
+				int volume = this.getVolume();
+				
+				dos.writeInt(volume);
 
-			dos.writeInt(volume);
+				synchronized (this.worldLock) {
+					for (int i = 0; i < volume; i++) {
+						dos.writeByte(this.blockData[i]);
+					}
 
-			synchronized (this.worldLock) {
-				for (int i = 0; i < volume; i++) {
-					dos.writeInt(this.blockData[i]);
+					this.players.add(player);
 				}
 
-				this.players.add(player);
+				dos.close();
+
+				return baos.toByteArray();
+			} catch (IOException e) {
+				throw new RuntimeException("Unexpected IOException while compressing the map data.", e);
 			}
-
-			dos.flush();
-
-			return baos.toByteArray();
-		} catch (IOException e) {
-			throw new RuntimeException("Unexpected IOException while compressing the map data.", e);
 		}
 	}
 
