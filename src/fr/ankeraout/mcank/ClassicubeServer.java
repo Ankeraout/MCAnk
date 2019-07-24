@@ -1,5 +1,9 @@
 package fr.ankeraout.mcank;
 
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -15,6 +19,7 @@ import java.util.logging.Logger;
 
 import fr.ankeraout.mcank.util.StringUtils;
 import fr.ankeraout.mcank.world.World;
+import fr.ankeraout.mcank.world.WorldLoaderFactory;
 import fr.ankeraout.mcank.worldgen.WorldGeneratorFactory;
 
 /**
@@ -100,6 +105,7 @@ public final class ClassicubeServer {
 		// Initialize the server data structures
 		this.properties = new ClassicubeServerProperties();
 		this.worlds = new HashMap<String, World>();
+		this.ranks = new HashMap<String, Rank>();
 
 		// The salt is not generated yet.
 		this.salt = null;
@@ -146,7 +152,8 @@ public final class ClassicubeServer {
 	 * 
 	 * @throws IOException      If the server socket could not be created
 	 * @throws RuntimeException If the server is not in the
-	 *                          {@link ClassicubeServerState#STOPPED} state.
+	 *                          {@link ClassicubeServerState#STOPPED} state or if an
+	 *                          error occurs while starting it.
 	 */
 	public void start() throws IOException, RuntimeException {
 		// The state of the server before starting it
@@ -165,8 +172,12 @@ public final class ClassicubeServer {
 			this.state = ClassicubeServerState.STARTING;
 		}
 
-		// TODO: Detect worlds
-		// TODO: Load main world
+		// Detect worlds
+		try {
+			this.loadWorlds();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to load worlds.", e);
+		}
 
 		// If the main world does not exist, generate a 128^3 flatgrass map.
 		if (!this.worlds.containsKey(this.properties.getDefaultWorld())) {
@@ -175,12 +186,22 @@ public final class ClassicubeServer {
 					128, WorldGeneratorFactory.getInstance().getGenerator("flatgrass"), random.nextLong()));
 		}
 
+		// Load main world
+		if (!this.getWorldByName(this.properties.getDefaultWorld()).isLoaded()) {
+			this.getWorldByName(this.properties.getDefaultWorld()).load();
+		}
+
 		// TODO: Detect and load ranks
+		try {
+			this.loadRanks();
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to load ranks.", e);
+		}
 
 		// If the default rank does not exist, generate the default rank with permission
 		// level 0.
 		if (!this.ranks.containsKey(this.properties.getDefaultRank())) {
-			this.ranks.put(this.properties.getDefaultRank(), new Rank(this.properties.getDefaultRank(), '7', 0));
+			this.ranks.put(this.properties.getDefaultRank(), new Rank(this.properties.getDefaultRank(), '7', 0, false));
 		}
 
 		// Generate the server salt
@@ -212,6 +233,36 @@ public final class ClassicubeServer {
 		synchronized (this.stateLock) {
 			this.state = ClassicubeServerState.STARTED;
 		}
+	}
+
+	/**
+	 * Detects and loads the worlds. If the main world does not exist, then this
+	 * method will create it.
+	 * 
+	 * @throws IOException If an exception occurs while loading a world.
+	 */
+	private void loadWorlds() throws IOException {
+		File worldsDirectory = new File("worlds");
+		File[] worldFiles = worldsDirectory.listFiles();
+
+		if (worldFiles == null) {
+			// No worlds to load
+			return;
+		}
+
+		for (File file : worldFiles) {
+			// Read file magic value
+			FileInputStream fis = new FileInputStream(file);
+			DataInputStream dis = new DataInputStream(fis);
+			long magic = dis.readLong();
+			dis.close();
+
+			this.worlds.put(file.getName(), WorldLoaderFactory.getInstance().getWorldLoader(magic).loadWorld(file));
+		}
+	}
+
+	private void loadRanks() throws IOException {
+
 	}
 
 	/**
@@ -352,6 +403,16 @@ public final class ClassicubeServer {
 	 */
 	public World getWorldByName(String worldName) {
 		return this.worlds.get(worldName);
+	}
+
+	/**
+	 * Returns a rank by its name, or <code>null</code> if no rank has this name.
+	 * 
+	 * @param rankName The name of the rank.
+	 * @return The rank with the given name.
+	 */
+	public Rank getRankByName(String rankName) {
+		return this.ranks.get(rankName);
 	}
 
 	/**

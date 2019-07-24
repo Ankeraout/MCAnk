@@ -27,17 +27,27 @@ public class Rank {
 	private int permissionLevel;
 
 	/**
+	 * <code>true</code> if a player with this rank should be considered as op (has
+	 * access to all blocks), <code>false</code> otherwise.
+	 */
+	private boolean op;
+
+	/**
 	 * Creates a new rank with the given informations.
 	 * 
 	 * @param name            The name of the rank.
 	 * @param color           The color of the nicknames of the players who have
 	 *                        this rank.
 	 * @param permissionLevel The permission level of this rank.
+	 * @param op              <code>true</code> if a player with this rank should be
+	 *                        considered as op (has access to all blocks),
+	 *                        <code>false</code> otherwise.
 	 */
-	public Rank(String name, char color, int permissionLevel) {
+	public Rank(String name, char color, int permissionLevel, boolean op) {
 		this.name = name;
 		this.color = color;
 		this.permissionLevel = permissionLevel;
+		this.op = op;
 	}
 
 	/**
@@ -65,5 +75,16 @@ public class Rank {
 	 */
 	public int getPermissionLevel() {
 		return this.permissionLevel;
+	}
+
+	/**
+	 * Returns <code>true</code> if a player with this rank should be considered as
+	 * op (has access to all blocks), <code>false</code> otherwise.
+	 * 
+	 * @return <code>true</code> if a player with this rank should be considered as
+	 *         op (has access to all blocks), <code>false</code> otherwise.
+	 */
+	public boolean isOp() {
+		return this.op;
 	}
 }

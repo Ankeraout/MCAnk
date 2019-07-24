@@ -1,5 +1,6 @@
 package fr.ankeraout.mcank.world;
 
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -26,14 +27,13 @@ public interface WorldLoader {
 	 * object. This method only loads the main attributes of the {@link World}
 	 * object, it does not load the block data.
 	 * 
-	 * @param name The name of the world to load (the file name depends on this
-	 *             value).
+	 * @param name The file of the world to load.
 	 * @return The world that was loaded
 	 * @throws IOException If an I/O error occurs while loading the world file, or
 	 *                     if the world format is not recognized (the world file is
 	 *                     probably corrupt).
 	 */
-	public World loadWorld(String name) throws IOException;
+	public World loadWorld(File file) throws IOException;
 
 	/**
 	 * Loads the block data of the given world. This method should probably only be

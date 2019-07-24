@@ -30,9 +30,12 @@ public interface Command {
 	 * value from the following ones:
 	 * <ul>
 	 * <li>0: If the command should be available to everyone</li>
-	 * <li>20: If the command should be available to people who have little experience on the server</li>
-	 * <li>40: If the command should be available to people who have experience on the server</li>
-	 * <li>60: If the command should be available to people who have a lot of experience on the server</li>
+	 * <li>20: If the command should be available to people who have little
+	 * experience on the server</li>
+	 * <li>40: If the command should be available to people who have experience on
+	 * the server</li>
+	 * <li>60: If the command should be available to people who have a lot of
+	 * experience on the server</li>
 	 * <li>80: If the command should be available to the server moderators</li>
 	 * <li>100: If the command should be available to the server administrators</li>
 	 * </ul>
@@ -42,10 +45,29 @@ public interface Command {
 	public int getDefaultPermissionLevel();
 
 	/**
+	 * Returns a boolean value that defines whether this command can be called by
+	 * the console or not.
+	 * 
+	 * @return A boolean value that defines whether this command can be called by
+	 *         the console or not.
+	 */
+	public boolean canBeCalledByConsole();
+
+	/**
+	 * Returns a boolean value that defines whether this command can be called by a
+	 * player or not.
+	 * 
+	 * @return A boolean value that defines whether this command can be called by a
+	 *         player or not.
+	 */
+	public boolean canBeCalledByPlayer();
+
+	/**
 	 * This method is called everytime a player calls this command, if he has the
 	 * permission to do so.
 	 * 
-	 * @param caller The {@link Player} who has called the command.
+	 * @param caller The {@link Player} who has called the command. If the calling
+	 *               player is the console, then this will be <code>null</code>.
 	 * @param args   The arguments passed to the command. Note that the first
 	 *               element in this array is the command name.
 	 */

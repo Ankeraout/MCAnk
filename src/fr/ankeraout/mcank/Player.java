@@ -195,8 +195,16 @@ public class Player {
 			this.doCPENegotiation();
 		}
 
-		// Kill the player login timeout thread
-		this.playerloginTimeoutThread.interrupt();
+		// TODO: Read player information
+		// This code must execute when the player ionformation has not been found
+		this.rank = ClassicubeServer.getInstance().getRankByName(ClassicubeServer.getInstance().getProperties().getDefaultRank());
+
+		// Send the server identification packet
+		this.outputStream.writeByte(PacketID.SERVER_IDENTIFICATION.getID());
+		this.outputStream.writeByte(ClassicubeServer.PROTOCOL_VERSION);
+		this.outputStream.writeClassicubeString(ClassicubeServer.getInstance().getProperties().getName());
+		this.outputStream.writeClassicubeString(ClassicubeServer.getInstance().getProperties().getMotd());
+		this.outputStream.writeByte(this.rank.isOp() ? 0x64 : 0x00);
 	}
 
 	/**

@@ -1,5 +1,8 @@
 package fr.ankeraout.mcank.world;
 
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
 import fr.ankeraout.mcank.worldgen.WorldGenerator;
@@ -16,7 +19,7 @@ public class World {
 	/**
 	 * This lock protects the block data and the load status of the world.
 	 */
-	private Object worldLock;
+	Object worldLock;
 
 	/**
 	 * Contains the status of the world. See {@link WorldLoadStatus} for more
@@ -57,7 +60,7 @@ public class World {
 	 * blockDataIndex is the index of the block in the array at the given (x, y, z)
 	 * coordinates.
 	 */
-	private int blockData[];
+	int blockData[];
 
 	/**
 	 * The position on the X axis where a player is teleported to when joining this
@@ -100,6 +103,47 @@ public class World {
 	private int visitPermission;
 
 	/**
+	 * The file that contains the data of the world.
+	 */
+	private File worldFile;
+
+	/**
+	 * This constructor contains the common code for all the constructors of this
+	 * class.
+	 */
+	private World(int width, int height, int depth) {
+		if (width % 16 != 0) {
+			throw new IllegalArgumentException("The width value is not a multiple of 16.");
+		}
+
+		if (width < 16 || width > 1024) {
+			throw new IllegalArgumentException("The width value is out of bounds.");
+		}
+
+		if (height % 16 != 0) {
+			throw new IllegalArgumentException("The height value is not a multiple of 16.");
+		}
+
+		if (height < 16 || height > 1024) {
+			throw new IllegalArgumentException("The height value is out of bounds.");
+		}
+
+		if (depth % 16 != 0) {
+			throw new IllegalArgumentException("The depth value is not a multiple of 16.");
+		}
+
+		if (depth < 16 || depth > 1024) {
+			throw new IllegalArgumentException("The depth value is out of bounds.");
+		}
+
+		// Initialize locks
+		this.worldLock = new Object();
+
+		// Initialize world load state
+		this.loadState = WorldLoadState.UNLOADED;
+	}
+
+	/**
 	 * Creates a new world with the given name, and generates the chunks in it using
 	 * the given {@link WorldGenerator} and the given seed.
 	 * 
@@ -117,32 +161,7 @@ public class World {
 	 * @throws IllegalArgumentException If one of the argument values is incorrect.
 	 */
 	public World(String name, int width, int height, int depth, WorldGenerator generator, long seed) {
-		if(width % 16 != 0) {
-			throw new IllegalArgumentException("The width value is not a multiple of 16.");
-		}
-
-		if(width < 16 || width > 1024) {
-			throw new IllegalArgumentException("The width value is out of bounds.");
-		}
-
-		if(height % 16 != 0) {
-			throw new IllegalArgumentException("The height value is not a multiple of 16.");
-		}
-
-		if(height < 16 || height > 1024) {
-			throw new IllegalArgumentException("The height value is out of bounds.");
-		}
-
-		if(depth % 16 != 0) {
-			throw new IllegalArgumentException("The depth value is not a multiple of 16.");
-		}
-
-		if(depth < 16 || depth > 1024) {
-			throw new IllegalArgumentException("The depth value is out of bounds.");
-		}
-
-		// Initialize locks
-		this.worldLock = new Object();
+		this(width, height, depth);
 
 		// Initialize world attributes
 		this.name = name;
@@ -161,6 +180,47 @@ public class World {
 
 		// Generate world
 		generator.generateWorld(this.blockData, width, height, depth, seed);
+		
+		// Set world load state to LOADED because it was previously generated.
+		this.loadState = WorldLoadState.LOADED;
+	}
+
+	/**
+	 * This constructor was made so that a {@link WorldLoader} can easily initialize
+	 * a new instance of the {@link World} class. It's its only purpose.
+	 * 
+	 * @param name            The name of the world.
+	 * @param motd            The motd of the world (will be considered as null if
+	 *                        empty).
+	 * @param width           The width of the world in blocks.
+	 * @param height          The height of the world in blocks.
+	 * @param depth           The depth of the world in blocks.
+	 * @param spawnX          The X position of the spawn.
+	 * @param spawnY          The Y position of the spawn (player head position!).
+	 * @param spawnZ          The Z position of the spawn.
+	 * @param spawnYaw        The yaw of the player when spawning.
+	 * @param spawnPitch      The pitch of the player when spawning.
+	 * @param buildPermission The build permission of this world.
+	 * @param visitPermission The visit permission of this world.
+	 */
+	World(String name, String motd, int width, int height, int depth, float spawnX, float spawnY, float spawnZ,
+			float spawnYaw, float spawnPitch, int buildPermission, int visitPermission, File worldFile) {
+		this(width, height, depth);
+
+		// Initialize world attributes
+		this.name = name;
+		this.motd = motd;
+		this.width = width;
+		this.height = height;
+		this.depth = depth;
+		this.spawnX = spawnX;
+		this.spawnY = spawnY;
+		this.spawnZ = spawnZ;
+		this.spawnYaw = spawnYaw;
+		this.spawnPitch = spawnPitch;
+		this.buildPermission = buildPermission;
+		this.visitPermission = visitPermission;
+		this.worldFile = worldFile;
 	}
 
 	/**
@@ -175,23 +235,51 @@ public class World {
 		WorldLoadState oldState = null;
 
 		// Set the world state to LOADING
-		synchronized(this.worldLock) {
+		synchronized (this.worldLock) {
 			// Save the current world state
 			oldState = this.loadState;
 
 			// Reject the load request if the world is not UNLOADED
-			if(!this.loadState.isStartCallAllowed()) {
+			if (!this.loadState.isStartCallAllowed()) {
 				throw new RuntimeException("The current world state does not allow loading it.");
 			}
 
 			this.loadState = WorldLoadState.LOADING;
 		}
-
-		// TODO
+		
+		try {
+			// Read world file magic value
+			FileInputStream fis = new FileInputStream(this.worldFile);
+			DataInputStream dis = new DataInputStream(fis);
+			long magic = dis.readLong();
+			dis.close();
+			
+			// Load the world using the correct world loader
+			WorldLoaderFactory.getInstance().getWorldLoader(magic).loadBlockData(this);
+		} catch(IOException e) {
+			// Restore world state
+			synchronized(this.worldLock) {
+				this.loadState = oldState;
+			}
+			
+			// Propagate exception
+			throw e;
+		}
 
 		// Set the world state to LOADED
-		synchronized(this.worldLock) {
+		synchronized (this.worldLock) {
 			this.loadState = WorldLoadState.LOADED;
+		}
+	}
+
+	/**
+	 * Returns a boolean value that defines whether the world is loaded or not.
+	 * 
+	 * @return A boolean value that defines whether the world is loaded or not.
+	 */
+	public boolean isLoaded() {
+		synchronized (this.worldLock) {
+			return this.loadState == WorldLoadState.LOADED;
 		}
 	}
 
@@ -201,8 +289,8 @@ public class World {
 	 * @throws IOException If the world file could not be written.
 	 */
 	public void save() throws IOException {
-		synchronized(this.worldLock) {
-			
+		synchronized (this.worldLock) {
+			// TODO
 		}
 	}
 
@@ -220,37 +308,55 @@ public class World {
 		WorldLoadState oldState = null;
 
 		// Set the world state to UNLOADING
-		synchronized(this.worldLock) {
+		synchronized (this.worldLock) {
 			// Save the current world state
 			oldState = this.loadState;
 
 			// Reject the unload request if the world is not LOADED
-			if(!this.loadState.isStopCallAllowed()) {
+			if (!this.loadState.isStopCallAllowed()) {
 				throw new RuntimeException("The current world state does not allow unloading it.");
 			}
 
 			this.loadState = WorldLoadState.UNLOADING;
 		}
 
+		// TODO: kick all the players outside of this world
+
 		try {
 			this.save();
-		} catch(IOException e) {
+		} catch (IOException e) {
 			// Reset the world state
-			synchronized(this.worldLock) {
+			synchronized (this.worldLock) {
 				this.loadState = oldState;
 			}
 		}
 
-		// TODO: kick all the players outside of this world
-
 		// Set the world state to UNLOADED
-		synchronized(this.worldLock) {
+		synchronized (this.worldLock) {
 			this.loadState = WorldLoadState.UNLOADED;
 
 			// Break the reference to the world data, allowing the garbage
 			// collector to destroy the object
 			this.blockData = null;
 		}
+	}
+
+	/**
+	 * Returns the world file.
+	 * 
+	 * @return The world file.
+	 */
+	public File getWorldFile() {
+		return this.worldFile;
+	}
+
+	/**
+	 * Returns the volume of the world in blocks.
+	 * 
+	 * @return The volume of the world in blocks.
+	 */
+	public int getVolume() {
+		return this.width * this.height * this.depth;
 	}
 
 	/**
