@@ -1,12 +1,17 @@
 package fr.ankeraout.mcank.world;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.zip.GZIPOutputStream;
 
+import fr.ankeraout.mcank.Player;
 import fr.ankeraout.mcank.worldgen.WorldGenerator;
 
 /**
@@ -110,6 +115,11 @@ public class World {
 	private File worldFile;
 
 	/**
+	 * The set that contains the registered players in this world.
+	 */
+	private Set<Player> players;
+
+	/**
 	 * This constructor contains the common code for all the constructors of this
 	 * class.
 	 */
@@ -143,6 +153,9 @@ public class World {
 
 		// Initialize world load state
 		this.loadState = WorldLoadState.UNLOADED;
+
+		// Initialize world data structures
+		this.players = new HashSet<Player>();
 	}
 
 	/**
@@ -401,6 +414,122 @@ public class World {
 	 */
 	public int getVolume() {
 		return this.width * this.height * this.depth;
+	}
+
+	/**
+	 * Registers the given player in the world. This method will return the world
+	 * data to send to the player in the level data chunk packets.
+	 * 
+	 * @param player The player to register.
+	 * @return The world data to send to the player.
+	 */
+	public byte[] registerPlayer(Player player) {
+		try {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			GZIPOutputStream gzos = new GZIPOutputStream(baos);
+			DataOutputStream dos = new DataOutputStream(gzos);
+
+			// Write the world volume
+			int volume = this.getVolume();
+
+			dos.writeInt(volume);
+
+			synchronized (this.worldLock) {
+				for (int i = 0; i < volume; i++) {
+					dos.writeInt(this.blockData[i]);
+				}
+
+				this.players.add(player);
+			}
+
+			dos.flush();
+
+			return baos.toByteArray();
+		} catch (IOException e) {
+			throw new RuntimeException("Unexpected IOException while compressing the map data.", e);
+		}
+	}
+
+	/**
+	 * Unregisters the given player from the world. If the player was not previously
+	 * registered, then this method will do nothing.
+	 * 
+	 * @param player The player to unregister from this world.
+	 */
+	public void unregisterPlayer(Player player) {
+		this.players.remove(player);
+	}
+
+	/**
+	 * Returns the width of this world.
+	 * 
+	 * @return The width of this world.
+	 */
+	public int getWidth() {
+		return this.width;
+	}
+
+	/**
+	 * Returns the height of this world.
+	 * 
+	 * @return The height of this world.
+	 */
+	public int getHeight() {
+		return this.height;
+	}
+
+	/**
+	 * Returns the depth of this world.
+	 * 
+	 * @return The depth of this world.
+	 */
+	public int getDepth() {
+		return this.depth;
+	}
+
+	/**
+	 * Returns the X position of the spawn in this world.
+	 * 
+	 * @return The X position of the spawn in this world.
+	 */
+	public float getSpawnX() {
+		return this.spawnX;
+	}
+
+	/**
+	 * Returns the Y position of the spawn in this world.
+	 * 
+	 * @return The Y position of the spawn in this world.
+	 */
+	public float getSpawnY() {
+		return this.spawnY;
+	}
+
+	/**
+	 * Returns the Z position of the spawn in this world.
+	 * 
+	 * @return The Z position of the spawn in this world.
+	 */
+	public float getSpawnZ() {
+		return this.spawnZ;
+	}
+
+	/**
+	 * Returns the yaw of a player spawning in this world.
+	 * 
+	 * @return The yaw of a player spawning in this world.
+	 */
+	public float getSpawnYaw() {
+		return this.spawnYaw;
+	}
+
+	/**
+	 * Returns the pitch of a player spawning in this world.
+	 * 
+	 * @return The pitch of a player spawning in this world.
+	 */
+	public float getSpawnPitch() {
+		return this.spawnPitch;
 	}
 
 	/**

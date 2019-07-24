@@ -197,7 +197,8 @@ public class Player {
 
 		// TODO: Read player information
 		// This code must execute when the player ionformation has not been found
-		this.rank = ClassicubeServer.getInstance().getRankByName(ClassicubeServer.getInstance().getProperties().getDefaultRank());
+		this.rank = ClassicubeServer.getInstance()
+				.getRankByName(ClassicubeServer.getInstance().getProperties().getDefaultRank());
 
 		// Send the server identification packet
 		this.outputStream.writeByte(PacketID.SERVER_IDENTIFICATION.getID());
@@ -267,12 +268,78 @@ public class Player {
 		}
 	}
 
-	private void setWorldAsync() throws IOException {
+	private void setWorldAsync(World w) throws IOException {
 		synchronized (this.setWorldLock) {
 			synchronized (this.outputStreamLock) {
 				this.outputStream.writeByte(PacketID.LEVEL_INITIALIZE.getID());
 			}
 
+			byte[] worldData = w.registerPlayer(this);
+
+			this.world = w;
+
+			int chunkCount = worldData.length / 1024;
+
+			if (worldData.length % 1024 != 0) {
+				chunkCount++;
+			}
+
+			for (int i = 0; i < chunkCount; i++) {
+				int chunkStart = i * 1024;
+				int chunkEnd = Math.min(chunkStart + 1024, worldData.length);
+				int chunkLength = chunkEnd - chunkStart;
+				int progress = (i + 1) * 100 / chunkCount;
+
+				synchronized (this.outputStreamLock) {
+					this.outputStream.writeByte(PacketID.LEVEL_DATA_CHUNK.getID());
+					this.outputStream.writeShort(chunkLength);
+					this.outputStream.write(worldData, chunkStart, chunkLength);
+					
+					while(chunkLength < 1024) {
+						this.outputStream.writeByte(0x00);
+						chunkLength++;
+					}
+					
+					this.outputStream.writeByte(progress);
+				}
+			}
+
+			synchronized (this.outputStreamLock) {
+				this.outputStream.writeByte(PacketID.LEVEL_FINALIZE.getID());
+				this.outputStream.writeShort(w.getWidth());
+				this.outputStream.writeShort(w.getHeight());
+				this.outputStream.writeShort(w.getDepth());
+			}
+
+			this.position = new Position(w.getSpawnX(), w.getSpawnY(), w.getSpawnZ());
+			this.orientation = new Orientation(w.getSpawnYaw(), w.getSpawnPitch());
+
+			synchronized (this.outputStreamLock) {
+				this.outputStream.writeByte(PacketID.SPAWN_PLAYER.getID());
+				this.outputStream.writeByte(255);
+				this.outputStream.writeClassicubeString(this.name);
+				this.outputStream.writeShort(this.position.getShortX());
+				this.outputStream.writeShort(this.position.getShortY());
+				this.outputStream.writeShort(this.position.getShortZ());
+				this.outputStream.writeByte(this.orientation.getByteYaw());
+				this.outputStream.writeByte(this.orientation.getBytePitch());
+			}
+
+			synchronized (this.outputStreamLock) {
+				this.outputStream.writeByte(PacketID.POSITION_ORIENTATION_ABSOLUTE.getID());
+				this.outputStream.writeByte(255);
+				this.outputStream.writeShort(this.position.getShortX());
+				this.outputStream.writeShort(this.position.getShortY());
+				this.outputStream.writeShort(this.position.getShortZ());
+				this.outputStream.writeByte(this.orientation.getByteYaw());
+				this.outputStream.writeByte(this.orientation.getBytePitch());
+			}
+
+			synchronized (this.outputStreamLock) {
+				this.outputStream.writeByte(PacketID.MESSAGE.getID());
+				this.outputStream.writeByte(0x00);
+				this.outputStream.writeClassicubeString("Welcome!");
+			}
 		}
 	}
 
@@ -280,7 +347,7 @@ public class Player {
 		synchronized (this.setWorldLock) {
 			new Thread(() -> {
 				try {
-					this.setWorldAsync();
+					this.setWorldAsync(w);
 				} catch (IOException e) {
 					Logger.getLogger(ClassicubeServer.LOGGER_NAME).log(Level.INFO,
 							"Player " + this.name + " has left the game while receiving map data.");

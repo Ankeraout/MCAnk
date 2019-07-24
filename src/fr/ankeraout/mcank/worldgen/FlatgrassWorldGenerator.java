@@ -27,7 +27,7 @@ public class FlatgrassWorldGenerator extends WorldGenerator {
 
 		for (int x = chunkBlockX; x < chunkBlockX + 16; x++) {
 			for (int z = chunkBlockZ; z < chunkBlockZ + 16; z++) {
-				worldData[((worldHeight / 2) * worldDepth + z) * worldWidth + x] = Blocks.DIRT.getBlockId();
+				worldData[((worldHeight / 2) * worldDepth + z) * worldWidth + x] = Blocks.GRASS.getBlockId();
 			}
 		}
 	}

@@ -31,7 +31,7 @@ public class WorldLoaderFactory {
 	private WorldLoaderFactory() {
 		// Register world loaders
 		this.worldLoaders = new HashMap<Long, WorldLoader>();
-		this.worldLoaders.put(0x0000000000000000L, new WorldLoader0000000000000000());
+		this.addWorldLoader(new WorldLoader0000000000000000());
 	}
 
 	/**

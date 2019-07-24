@@ -3,7 +3,6 @@ package fr.ankeraout.mcank;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -261,8 +260,14 @@ public final class ClassicubeServer {
 		}
 	}
 
+	/**
+	 * Detects and loads the ranks. If the main rank does not exist, then this
+	 * method will create it.
+	 * 
+	 * @throws IOException If an exception occurs while loading a rank.
+	 */
 	private void loadRanks() throws IOException {
-
+		// TODO
 	}
 
 	/**
