@@ -1,8 +1,10 @@
 package fr.ankeraout.mcank.world;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 
 import fr.ankeraout.mcank.worldgen.WorldGenerator;
@@ -180,7 +182,7 @@ public class World {
 
 		// Generate world
 		generator.generateWorld(this.blockData, width, height, depth, seed);
-		
+
 		// Set world load state to LOADED because it was previously generated.
 		this.loadState = WorldLoadState.LOADED;
 	}
@@ -202,6 +204,7 @@ public class World {
 	 * @param spawnPitch      The pitch of the player when spawning.
 	 * @param buildPermission The build permission of this world.
 	 * @param visitPermission The visit permission of this world.
+	 * @param worldFile       The world file.
 	 */
 	World(String name, String motd, int width, int height, int depth, float spawnX, float spawnY, float spawnZ,
 			float spawnYaw, float spawnPitch, int buildPermission, int visitPermission, File worldFile) {
@@ -246,22 +249,22 @@ public class World {
 
 			this.loadState = WorldLoadState.LOADING;
 		}
-		
+
 		try {
 			// Read world file magic value
 			FileInputStream fis = new FileInputStream(this.worldFile);
 			DataInputStream dis = new DataInputStream(fis);
 			long magic = dis.readLong();
 			dis.close();
-			
+
 			// Load the world using the correct world loader
 			WorldLoaderFactory.getInstance().getWorldLoader(magic).loadBlockData(this);
-		} catch(IOException e) {
+		} catch (IOException e) {
 			// Restore world state
-			synchronized(this.worldLock) {
+			synchronized (this.worldLock) {
 				this.loadState = oldState;
 			}
-			
+
 			// Propagate exception
 			throw e;
 		}
@@ -286,11 +289,52 @@ public class World {
 	/**
 	 * Saves the world file.
 	 * 
-	 * @throws IOException If the world file could not be written.
+	 * @throws IOException      If the world file could not be written.
+	 * @throws RuntimeException If the world is not in the
+	 *                          {@link WorldLoadState#LOADED} state when calling
+	 *                          this method.
 	 */
 	public void save() throws IOException {
 		synchronized (this.worldLock) {
-			// TODO
+			// Reject the unload request if the world is not LOADED
+			if (this.loadState != WorldLoadState.LOADED) {
+				throw new RuntimeException("The current world state does not allow saving it.");
+			}
+
+			FileOutputStream fos = new FileOutputStream(this.worldFile);
+			DataOutputStream dos = new DataOutputStream(fos);
+
+			// Magic value of current world file format version
+			dos.writeLong(0x0000000000000000);
+
+			byte[] strData = this.name.getBytes();
+			dos.writeInt(strData.length);
+			dos.write(strData);
+
+			strData = this.motd.getBytes();
+			dos.writeInt(strData.length);
+			dos.write(strData);
+
+			strData = null;
+
+			dos.writeInt(this.width);
+			dos.writeInt(this.height);
+			dos.writeInt(this.depth);
+			dos.writeFloat(this.spawnX);
+			dos.writeFloat(this.spawnY);
+			dos.writeFloat(this.spawnZ);
+			dos.writeFloat(this.spawnYaw);
+			dos.writeFloat(this.spawnPitch);
+			dos.writeInt(this.buildPermission);
+			dos.writeInt(this.visitPermission);
+
+			int volume = this.getVolume();
+
+			for (int i = 0; i < volume; i++) {
+				dos.writeInt(this.blockData[i]);
+			}
+
+			dos.close();
 		}
 	}
 
