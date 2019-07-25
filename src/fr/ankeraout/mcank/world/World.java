@@ -7,11 +7,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPOutputStream;
 
-import fr.ankeraout.mcank.Player;
 import fr.ankeraout.mcank.worldgen.WorldGenerator;
 
 /**
@@ -26,7 +25,7 @@ public class World {
 	/**
 	 * This lock protects the block data and the load status of the world.
 	 */
-	Object worldLock;
+	private Lock worldLock;
 
 	/**
 	 * Contains the status of the world. See {@link WorldLoadStatus} for more
@@ -115,11 +114,6 @@ public class World {
 	private File worldFile;
 
 	/**
-	 * The set that contains the registered players in this world.
-	 */
-	private Set<Player> players;
-
-	/**
 	 * This constructor contains the common code for all the constructors of this
 	 * class.
 	 */
@@ -149,13 +143,10 @@ public class World {
 		}
 
 		// Initialize locks
-		this.worldLock = new Object();
+		this.worldLock = new ReentrantLock(true);
 
 		// Initialize world load state
 		this.loadState = WorldLoadState.UNLOADED;
-
-		// Initialize world data structures
-		this.players = new HashSet<Player>();
 	}
 
 	/**
@@ -251,17 +242,19 @@ public class World {
 		WorldLoadState oldState = null;
 
 		// Set the world state to LOADING
-		synchronized (this.worldLock) {
-			// Save the current world state
-			oldState = this.loadState;
+		this.worldLock.lock();
 
-			// Reject the load request if the world is not UNLOADED
-			if (!this.loadState.isStartCallAllowed()) {
-				throw new RuntimeException("The current world state does not allow loading it.");
-			}
+		// Save the current world state
+		oldState = this.loadState;
 
-			this.loadState = WorldLoadState.LOADING;
+		// Reject the load request if the world is not UNLOADED
+		if (!this.loadState.isStartCallAllowed()) {
+			throw new RuntimeException("The current world state does not allow loading it.");
 		}
+
+		this.loadState = WorldLoadState.LOADING;
+
+		this.worldLock.unlock();
 
 		try {
 			// Read world file magic value
@@ -274,18 +267,18 @@ public class World {
 			WorldLoaderFactory.getInstance().getWorldLoader(magic).loadBlockData(this);
 		} catch (IOException e) {
 			// Restore world state
-			synchronized (this.worldLock) {
-				this.loadState = oldState;
-			}
+			this.worldLock.lock();
+			this.loadState = oldState;
+			this.worldLock.unlock();
 
 			// Propagate exception
 			throw e;
 		}
 
 		// Set the world state to LOADED
-		synchronized (this.worldLock) {
-			this.loadState = WorldLoadState.LOADED;
-		}
+		this.worldLock.lock();
+		this.loadState = WorldLoadState.LOADED;
+		this.worldLock.unlock();
 	}
 
 	/**
@@ -294,9 +287,11 @@ public class World {
 	 * @return A boolean value that defines whether the world is loaded or not.
 	 */
 	public boolean isLoaded() {
-		synchronized (this.worldLock) {
-			return this.loadState == WorldLoadState.LOADED;
-		}
+		this.worldLock.lock();
+		WorldLoadState value = this.loadState;
+		this.worldLock.unlock();
+
+		return value == WorldLoadState.LOADED;
 	}
 
 	/**
@@ -308,47 +303,49 @@ public class World {
 	 *                          this method.
 	 */
 	public void save() throws IOException {
-		synchronized (this.worldLock) {
-			// Reject the unload request if the world is not LOADED
-			if (this.loadState != WorldLoadState.LOADED) {
-				throw new RuntimeException("The current world state does not allow saving it.");
-			}
+		this.worldLock.lock();
 
-			FileOutputStream fos = new FileOutputStream(this.worldFile);
-			DataOutputStream dos = new DataOutputStream(fos);
-
-			// Magic value of current world file format version
-			dos.writeLong(0x0000000000000000);
-
-			byte[] strData = this.name.getBytes();
-			dos.writeInt(strData.length);
-			dos.write(strData);
-
-			strData = this.motd.getBytes();
-			dos.writeInt(strData.length);
-			dos.write(strData);
-
-			strData = null;
-
-			dos.writeInt(this.width);
-			dos.writeInt(this.height);
-			dos.writeInt(this.depth);
-			dos.writeFloat(this.spawnX);
-			dos.writeFloat(this.spawnY);
-			dos.writeFloat(this.spawnZ);
-			dos.writeFloat(this.spawnYaw);
-			dos.writeFloat(this.spawnPitch);
-			dos.writeInt(this.buildPermission);
-			dos.writeInt(this.visitPermission);
-
-			int volume = this.getVolume();
-
-			for (int i = 0; i < volume; i++) {
-				dos.writeInt(this.blockData[i]);
-			}
-
-			dos.close();
+		// Reject the unload request if the world is not LOADED
+		if (this.loadState != WorldLoadState.LOADED) {
+			throw new RuntimeException("The current world state does not allow saving it.");
 		}
+
+		FileOutputStream fos = new FileOutputStream(this.worldFile);
+		DataOutputStream dos = new DataOutputStream(fos);
+
+		// Magic value of current world file format version
+		dos.writeLong(0x0000000000000000);
+
+		byte[] strData = this.name.getBytes();
+		dos.writeInt(strData.length);
+		dos.write(strData);
+
+		strData = this.motd.getBytes();
+		dos.writeInt(strData.length);
+		dos.write(strData);
+
+		strData = null;
+
+		dos.writeInt(this.width);
+		dos.writeInt(this.height);
+		dos.writeInt(this.depth);
+		dos.writeFloat(this.spawnX);
+		dos.writeFloat(this.spawnY);
+		dos.writeFloat(this.spawnZ);
+		dos.writeFloat(this.spawnYaw);
+		dos.writeFloat(this.spawnPitch);
+		dos.writeInt(this.buildPermission);
+		dos.writeInt(this.visitPermission);
+
+		int volume = this.getVolume();
+
+		for (int i = 0; i < volume; i++) {
+			dos.writeInt(this.blockData[i]);
+		}
+
+		dos.close();
+
+		this.worldLock.unlock();
 	}
 
 	/**
@@ -365,17 +362,17 @@ public class World {
 		WorldLoadState oldState = null;
 
 		// Set the world state to UNLOADING
-		synchronized (this.worldLock) {
-			// Save the current world state
-			oldState = this.loadState;
+		this.worldLock.lock();
+		// Save the current world state
+		oldState = this.loadState;
 
-			// Reject the unload request if the world is not LOADED
-			if (!this.loadState.isStopCallAllowed()) {
-				throw new RuntimeException("The current world state does not allow unloading it.");
-			}
-
-			this.loadState = WorldLoadState.UNLOADING;
+		// Reject the unload request if the world is not LOADED
+		if (!this.loadState.isStopCallAllowed()) {
+			throw new RuntimeException("The current world state does not allow unloading it.");
 		}
+
+		this.loadState = WorldLoadState.UNLOADING;
+		this.worldLock.unlock();
 
 		// TODO: kick all the players outside of this world
 
@@ -383,19 +380,19 @@ public class World {
 			this.save();
 		} catch (IOException e) {
 			// Reset the world state
-			synchronized (this.worldLock) {
-				this.loadState = oldState;
-			}
+			this.worldLock.lock();
+			this.loadState = oldState;
+			this.worldLock.unlock();
 		}
 
 		// Set the world state to UNLOADED
-		synchronized (this.worldLock) {
-			this.loadState = WorldLoadState.UNLOADED;
+		this.worldLock.lock();
+		this.loadState = WorldLoadState.UNLOADED;
 
-			// Break the reference to the world data, allowing the garbage
-			// collector to destroy the object
-			this.blockData = null;
-		}
+		// Break the reference to the world data, allowing the garbage
+		// collector to destroy the object
+		this.blockData = null;
+		this.worldLock.unlock();
 	}
 
 	/**
@@ -414,53 +411,6 @@ public class World {
 	 */
 	public int getVolume() {
 		return this.width * this.height * this.depth;
-	}
-
-	/**
-	 * Registers the given player in the world. This method will return the world
-	 * data to send to the player in the level data chunk packets.
-	 * 
-	 * @param player The player to register.
-	 * @return The world data to send to the player.
-	 */
-	public byte[] registerPlayer(Player player) {
-		synchronized (this.worldLock) {
-			try {
-				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				GZIPOutputStream gzos = new GZIPOutputStream(baos);
-				DataOutputStream dos = new DataOutputStream(gzos);
-				DataOutputStream dos2 = new DataOutputStream(baos);
-
-				// Write the world volume
-				int volume = this.getVolume();
-				
-				dos.writeInt(volume);
-
-				synchronized (this.worldLock) {
-					for (int i = 0; i < volume; i++) {
-						dos.writeByte(this.blockData[i]);
-					}
-
-					this.players.add(player);
-				}
-
-				dos.close();
-
-				return baos.toByteArray();
-			} catch (IOException e) {
-				throw new RuntimeException("Unexpected IOException while compressing the map data.", e);
-			}
-		}
-	}
-
-	/**
-	 * Unregisters the given player from the world. If the player was not previously
-	 * registered, then this method will do nothing.
-	 * 
-	 * @param player The player to unregister from this world.
-	 */
-	public void unregisterPlayer(Player player) {
-		this.players.remove(player);
 	}
 
 	/**
@@ -533,6 +483,39 @@ public class World {
 	 */
 	public float getSpawnPitch() {
 		return this.spawnPitch;
+	}
+
+	/**
+	 * Returns the lock of this world. Locking this lock prevents the world from
+	 * registering any event/operation.
+	 * 
+	 * @return The lock of this world.
+	 */
+	public Lock getLock() {
+		return this.worldLock;
+	}
+
+	public byte[] getCompressedWorldDataSynchronized() {
+		try {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			GZIPOutputStream gzos = new GZIPOutputStream(baos);
+			DataOutputStream dos = new DataOutputStream(gzos);
+
+			// Write the world volume
+			int volume = this.getVolume();
+
+			dos.writeInt(volume);
+
+			for (int i = 0; i < volume; i++) {
+				dos.writeByte(this.blockData[i]);
+			}
+
+			dos.close();
+
+			return baos.toByteArray();
+		} catch (IOException e) {
+			throw new RuntimeException("Unexpected IOException while compressing the map data.", e);
+		}
 	}
 
 	/**

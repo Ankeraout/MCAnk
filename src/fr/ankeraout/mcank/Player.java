@@ -235,6 +235,29 @@ public class Player {
 				.getWorldByName(ClassicubeServer.getInstance().getProperties().getDefaultWorld()));
 
 		// TODO: Read incoming player packets
+		try {
+			while(true) {
+				int packetId = this.inputStream.readByte();
+				
+				switch(packetId) {
+				case 0x00:
+					this.kick("Login packet not allowed.");
+					break;
+				case 0x05:
+					break;
+				case 0x08:
+					break;
+				case 0x0d:
+					break;
+				default:
+					this.kick("Unknown packet ID 0x" + String.format("%02X", packetId));
+				}
+			}
+		} catch(IOException e) {
+			// Player has disconnected
+		}
+		
+		// TODO: Player disconnect
 	}
 
 	/**
@@ -270,15 +293,13 @@ public class Player {
 
 	private void setWorldAsync(World w) throws IOException {
 		synchronized (this.setWorldLock) {
+			w.getLock().lock();
+
 			synchronized (this.outputStreamLock) {
 				this.outputStream.writeByte(PacketID.LEVEL_INITIALIZE.getID());
 			}
 
-			byte[] worldData = w.registerPlayer(this);
-			
-			if(this.world != null) {
-				this.world.unregisterPlayer(this);
-			}
+			byte[] worldData = world.getCompressedWorldDataSynchronized();
 
 			this.world = w;
 
@@ -298,12 +319,12 @@ public class Player {
 					this.outputStream.writeByte(PacketID.LEVEL_DATA_CHUNK.getID());
 					this.outputStream.writeShort(chunkLength);
 					this.outputStream.write(worldData, chunkStart, chunkLength);
-					
-					while(chunkLength < 1024) {
+
+					while (chunkLength < 1024) {
 						this.outputStream.writeByte(0x00);
 						chunkLength++;
 					}
-					
+
 					this.outputStream.writeByte(progress);
 				}
 			}
@@ -317,6 +338,8 @@ public class Player {
 
 			this.position = new Position(w.getSpawnX(), w.getSpawnY(), w.getSpawnZ());
 			this.orientation = new Orientation(w.getSpawnYaw(), w.getSpawnPitch());
+
+			w.getLock().unlock();
 
 			synchronized (this.outputStreamLock) {
 				this.outputStream.writeByte(PacketID.SPAWN_PLAYER.getID());

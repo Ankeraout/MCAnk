@@ -66,16 +66,18 @@ public class WorldLoader0000000000000000 implements WorldLoader {
 		dis.readFloat();
 		dis.readInt();
 		dis.readInt();
-		
+
 		// Read world data
-		synchronized(world.worldLock) {
-			int volume = world.getVolume();
-			
-			for(int i = 0; i < volume; i++) {
-				world.blockData[i] = dis.readInt();
-			}
+		world.getLock().lock();
+		
+		int volume = world.getVolume();
+
+		for (int i = 0; i < volume; i++) {
+			world.blockData[i] = dis.readInt();
 		}
 		
+		world.getLock().unlock();
+
 		dis.close();
 	}
 
